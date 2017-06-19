@@ -12,17 +12,34 @@
     
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 
-    <link rel="stylesheet" href="style.css">
+    <!--<link rel="stylesheet" href="style.css">-->
+    <style>
+        template {
+            display: none;
+        }
+    </style>
 
 </head>
 <body>
 
-    <div class="wrap">
+    <template>
 
-        <canvas id="gt-img"></canvas>
-        <input type="file" accept="image/*">
+        <canvas class="gt-img"></canvas>
+        <input class="gt-upload" type="file" accept="image/*">
+        <section class="gt-ctrl">
+            <button class="gt-ctrl_upload">Upload</button>
+            <button class="gt-ctrl_export">Export</button>
+        </section>
 
-    </div>
+    </template>
+
+    <div class="wrap"></div>
+
+    <script src="../dist/GeeTailor.js"></script> 
+    <script>
+        console.log(1);
+        new GeeTailor('.wrap', {});
+    </script>
         
 </body>
 </html>
