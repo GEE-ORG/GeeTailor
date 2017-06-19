@@ -1,0 +1,2 @@
+# GeeTailor
+Image cropping plugin
