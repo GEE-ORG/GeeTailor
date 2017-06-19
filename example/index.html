@@ -38,7 +38,10 @@
     <script src="../dist/GeeTailor.js"></script> 
     <script>
         console.log(1);
-        new GeeTailor('.wrap', {});
+        const gt = new GeeTailor('.wrap', {});
+        setTimeout(function() {
+            gt.mode = 'avatar';
+        }, 5000);
     </script>
         
 </body>
