@@ -184,7 +184,7 @@ export default class GeeTailor {
 
         // if (this.isMoving) return;
 
-        this.preview.style.backgroundImage = `url(${this.canvas.toDataURL()})`
+        // this.preview.style.backgroundImage = `url(${this.canvas.toDataURL()})`
 
         // this.output.toBlob(blob => this.preview.src = this.toUrl(blob));
     }
@@ -227,11 +227,13 @@ export default class GeeTailor {
             if (deltaY < 0 && this.imgBounding.width < this.canvas.width / 5) {
                 return;
             }
-            this.imgBounding.width += deltaY;
-            this.imgBounding.height += deltaY / this.ratio;
-            const offset = this.center(this.imgBounding.width, this.imgBounding.height);
-            this.imgBounding.offsetX = offset.offsetX + this.imgOffset.x;
-            this.imgBounding.offsetY = offset.offsetY + this.imgOffset.y;
+            const deltaWidth = deltaY;
+            const deltaHeight = deltaWidth / this.ratio;
+            this.imgBounding.width += deltaWidth;
+            this.imgBounding.height += deltaHeight;
+            // const offset = this.center(this.imgBounding.width, this.imgBounding.height);
+            this.imgBounding.offsetX -= deltaWidth / 2;
+            this.imgBounding.offsetY -= deltaHeight / 2;
 
             requestAnimationFrame(this.render.bind(this));
             st = setTimeout(() => {
@@ -239,30 +241,35 @@ export default class GeeTailor {
                 this.setPreview();
             }, 100);
         });
-        let isDragging = false;
+
         const startPoints = { x: 0, y: 0 };
         const imgOffset = { x: this.imgBounding.offsetX, y: this.imgBounding.offsetY };
         document.addEventListener('mousedown', e => {
             if (e.target !== this.canvas) return;
 
-            isDragging = true;
             this.isMoving = true;
             console.log(e);
-            startPoints.x = e.offsetX;
-            startPoints.y = e.offsetY;
+            startPoints.x = e.clientX;
+            startPoints.y = e.clientY;
         });
         document.addEventListener('mousemove', e => {
-            if (!isDragging) return;
+            if (!this.isMoving) return;
 
-            this.imgOffset.x = e.offsetX - startPoints.x;
-            this.imgOffset.y = e.offsetY - startPoints.y;
-            this.imgBounding.offsetX = (imgOffset.x + this.imgOffset.x) / 2;
-            this.imgBounding.offsetY = (imgOffset.y + this.imgOffset.y) / 2;
+            // this.imgOffset.x = e.offsetX - startPoints.x;
+            // this.imgOffset.y = e.offsetY - startPoints.y;
+            // this.imgBounding.offsetX = (imgOffset.x + this.imgOffset.x) / 2;
+            // this.imgBounding.offsetY = (imgOffset.y + this.imgOffset.y) / 2;
+
+            this.imgBounding.offsetX += (e.clientX - startPoints.x) * this.dpr;
+            this.imgBounding.offsetY += (e.clientY - startPoints.y) * this.dpr;
+            console.log(this.imgBounding.offsetX, this.imgBounding.offsetY, e.clientX, e.clientY,startPoints.x, startPoints.y);
+            startPoints.x = e.clientX;
+            startPoints.y = e.clientY;
 
             requestAnimationFrame(this.render.bind(this));
+            
         });
         document.addEventListener('mouseup', e => {
-            isDragging = false;
             this.isMoving = false;
             this.setPreview();
         })
@@ -323,6 +330,29 @@ export default class GeeTailor {
 
     get mode () {
         return this._mode;
+    }
+
+    get imgWidth () {
+        return this.imgBounding.width;
+    }
+    set imgWidth (val) {
+        this.imgBounding.width = Number(val) || this.imgBounding.width;
+        this.render();
+    }
+    get imgHeight () {
+        return this.imgBounding.height;
+    }
+    set imgHeight (val) {
+        this.imgBounding.height = Number(val) || this.imgBounding.height;
+        this.render();
+    }
+    private _scale: number = 0;
+    get scale () {
+        return this._scale;
+    }
+    set scale (val) {
+        this._scale = val;
+        this.render()    
     }
 
     private toBlob (data, type) {
