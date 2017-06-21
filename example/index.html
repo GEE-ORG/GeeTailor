@@ -24,12 +24,16 @@
 
     <template>
 
-        <canvas class="gt-img"></canvas>
-        <input class="gt-upload" type="file" accept="image/*">
-        <section class="gt-ctrl">
-            <button class="gt-ctrl_upload">Upload</button>
-            <button class="gt-ctrl_export">Export</button>
-        </section>
+    <div class="gt-canvas">
+        <canvas class="gt-img" style="background-color: rgba(0,0,0,.8)"></canvas>
+    </div>
+    <img class="gt-preview" style="display: none" download="gt-img">
+    <section class="gt-ctrl">
+        <button class="gt-ctrl_upload">Upload</button>
+        <button class="gt-ctrl_export">Export</button>
+
+        <input class="gt-upload" type="file" accept="image/jpg,image/png" style="display: none">
+    </section>
 
     </template>
 
@@ -38,10 +42,10 @@
     <script src="../dist/GeeTailor.js"></script> 
     <script>
         console.log(1);
-        const gt = new GeeTailor('.wrap', {mode: 'free'});
-        setTimeout(function() {
-            gt.mode = 'avatar';
-        }, 2000);
+        const gt = new GeeTailor('.wrap', {mode: 'avatar'});
+        // setTimeout(function() {
+        //     gt.mode = 'avatar';
+        // }, 2000);
     </script>
         
 </body>
