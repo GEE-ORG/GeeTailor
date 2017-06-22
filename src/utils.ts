@@ -57,3 +57,11 @@ export function toString (obj: any): string {
 export function isNative (func: Function): boolean {
     return /[native code]/.test(func.toString());
 }
+
+export function toBlob (data, type): Blob {
+    return new Blob([data], {type});
+}
+
+export function toUrl (obj): string {
+    return URL.createObjectURL(obj);
+}

@@ -1,4 +1,4 @@
-import { assign, nextTick } from './utils';
+import { assign, nextTick, toBlob, toUrl } from './utils';
 
 interface gtOption {
     width: number,
@@ -10,7 +10,7 @@ const defaultOption: gtOption = {
     width: 200,
     height: 200,
     mode: 'avatar',
-    maskType: 'circle'
+    maskType: 'circle' 
 }
 const template = `
 <div class="gt-canvas" style="display: inline-block">
@@ -76,10 +76,6 @@ export default class GeeTailor {
         offsetX: 0,
         offsetY: 0
     };
-    private imgOffset = {
-        x: 0,
-        y: 0
-    };
 
     private _mode: 'avatar'|'free';
 
@@ -102,7 +98,7 @@ export default class GeeTailor {
         this.btns['export'] = this.el.querySelector('.gt-ctrl_export') as HTMLButtonElement;
 
         this.ctx = this.canvas.getContext('2d');
-        this.ctx.scale(this.dpr, this.dpr);
+        // this.ctx.scale(this.dpr, this.dpr);
         // this.ctx.imageSmoothingEnabled = false;
 
         this.mode = this.option.mode;
@@ -111,11 +107,11 @@ export default class GeeTailor {
 
         if (this.mode === 'avatar') {
             const svgData = this.option.maskType === 'circle' ? circleMask : rectMask;
-            const maskData = this.toBlob(svgData, 'image/svg+xml');
+            const maskData = toBlob(svgData, 'image/svg+xml');
             this.svgMask.onload = () => {
                 this.ctx.drawImage(this.svgMask, 0, 0, this.canvas.width, this.canvas.width);
             };
-            this.svgMask.src = this.toUrl(maskData);
+            this.svgMask.src = toUrl(maskData);
         }
 
         this.addEvents();
@@ -150,10 +146,10 @@ export default class GeeTailor {
     private drawImg () {
         this.ctx.drawImage(
             this.img,
-            this.imgBounding.offsetX, 
-            this.imgBounding.offsetY, 
-            this.imgBounding.width, 
-            this.imgBounding.height
+            this.imgOffsetX, 
+            this.imgOffsetY, 
+            this.imgWidth, 
+            this.imgHeight
         );
     }
 
@@ -199,7 +195,7 @@ export default class GeeTailor {
         this.upload.addEventListener('change', (e: any) => {
             
             const imgFile = e.target.files[0];
-            const imgUrl = this.toUrl(imgFile);
+            const imgUrl = toUrl(imgFile);
             if (!/image\/(jpg|jpeg|png)/.test(imgFile.type)) {
                 console.error('Only support jpg and png format.');
                 return;
@@ -214,63 +210,66 @@ export default class GeeTailor {
         
         });
         let st;
+        const point = { x: 0, y: 0 };
+        let isScaling = false;
+        let isMoving = false;
         document.addEventListener('wheel', e => {
 
             if (e.target !== this.canvas) return;
 
-            this.isMoving = true;
+            isScaling = true;
+
             st && clearTimeout(st);
 
             e.preventDefault();
             const deltaY = e.wheelDeltaY;
-            // console.log(this.imgBounding.width);
-            if (deltaY < 0 && this.imgBounding.width < this.canvas.width / 5) {
-                return;
+            let deltaWidth = deltaY;
+
+            [point.x, point.y]  = [e.offsetX, e.offsetY];
+            const pointOnImg = {
+                x: point.x * this.dpr - this.imgOffsetX,
+                y: point.y * this.dpr - this.imgOffsetY
             }
-            const deltaWidth = deltaY;
-            const deltaHeight = deltaWidth / this.ratio;
-            this.imgBounding.width += deltaWidth;
-            this.imgBounding.height += deltaHeight;
-            // const offset = this.center(this.imgBounding.width, this.imgBounding.height);
-            this.imgBounding.offsetX -= deltaWidth / 2;
-            this.imgBounding.offsetY -= deltaHeight / 2;
+
+            console.log(point, pointOnImg);
+            
+            this.imgWidth += deltaWidth;
+
+            this.imgOffsetX -= (pointOnImg.x / this.imgWidth) * deltaWidth;
+            this.imgOffsetY -= (pointOnImg.y / this.imgHeight) * (deltaWidth / this.ratio);
 
             requestAnimationFrame(this.render.bind(this));
             st = setTimeout(() => {
-                this.isMoving = false;
+                isScaling = false;
                 this.setPreview();
-            }, 100);
+            }, 200);
         });
 
         const startPoints = { x: 0, y: 0 };
-        const imgOffset = { x: this.imgBounding.offsetX, y: this.imgBounding.offsetY };
+        const imgOffset = { x: this.imgOffsetX, y: this.imgOffsetY };
         document.addEventListener('mousedown', e => {
-            if (e.target !== this.canvas) return;
+            if (e.target !== this.canvas || isScaling) return;
 
-            this.isMoving = true;
+            isMoving = true;
+            document.body.style.cursor = 'move';
             console.log(e);
             startPoints.x = e.clientX;
             startPoints.y = e.clientY;
         });
         document.addEventListener('mousemove', e => {
-            if (!this.isMoving) return;
+            if (!isMoving || isScaling) return;
 
-            // this.imgOffset.x = e.offsetX - startPoints.x;
-            // this.imgOffset.y = e.offsetY - startPoints.y;
-            // this.imgBounding.offsetX = (imgOffset.x + this.imgOffset.x) / 2;
-            // this.imgBounding.offsetY = (imgOffset.y + this.imgOffset.y) / 2;
-
-            this.imgBounding.offsetX += (e.clientX - startPoints.x) * this.dpr;
-            this.imgBounding.offsetY += (e.clientY - startPoints.y) * this.dpr;
+            this.imgOffsetX += (e.clientX - startPoints.x) * this.dpr;
+            this.imgOffsetY += (e.clientY - startPoints.y) * this.dpr;
             console.log(this.imgBounding.offsetX, this.imgBounding.offsetY, e.clientX, e.clientY,startPoints.x, startPoints.y);
             startPoints.x = e.clientX;
             startPoints.y = e.clientY;
 
             requestAnimationFrame(this.render.bind(this));
-            
         });
         document.addEventListener('mouseup', e => {
-            this.isMoving = false;
+            isMoving = false;
+            document.body.style.cursor = 'auto';
             this.setPreview();
         })
     }
@@ -284,22 +283,14 @@ export default class GeeTailor {
         this.original.height = img.naturalHeight;
         this.ratio = img.width / img.height;
 
-        this.imgBounding.width = img.width;
-        this.imgBounding.height = img.height;
-
-        if (img.width > this.option.width) {
-            const scaleY = this.canvas.width / img.width;
-            this.imgBounding.width = this.canvas.width;
-            this.imgBounding.height = scaleY * this.imgBounding.height;
+        if (img.width > img.height) {
+            this.imgHeight = this.canvas.height;
+        } else {
+            this.imgWidth = this.canvas.width;
         }
-        if (img.height > this.option.height) {
-            const scaleX = this.canvas.height / this.imgBounding.height;
-            this.imgBounding.height = this.canvas.height;
-            this.imgBounding.width *= scaleX;
-        } 
 
-        this.imgBounding.offsetX = (this.canvas.width - this.imgBounding.width) / 2;
-        this.imgBounding.offsetY =  (this.canvas.height - this.imgBounding.height) / 2;
+        this.imgOffsetX = (this.canvas.width - this.imgWidth) / 2;
+        this.imgOffsetY =  (this.canvas.height - this.imgHeight) / 2;
         
         this.render();
     }
@@ -311,6 +302,9 @@ export default class GeeTailor {
         }
     }
 
+    get mode () {
+        return this._mode;
+    }
     set mode (val: 'avatar' | 'free') {
         this._mode = val;
         switch (val) {
@@ -328,23 +322,43 @@ export default class GeeTailor {
         }
     }
 
-    get mode () {
-        return this._mode;
-    }
-
     get imgWidth () {
         return this.imgBounding.width;
     }
     set imgWidth (val) {
-        this.imgBounding.width = Number(val) || this.imgBounding.width;
-        this.render();
+        let deltaWidth = Number(val) || this.imgBounding.width;
+        deltaWidth < 100 && (deltaWidth = 100); 
+        this.imgBounding.width = deltaWidth;
+        this.imgBounding.height = deltaWidth / this.ratio;
     }
     get imgHeight () {
         return this.imgBounding.height;
     }
     set imgHeight (val) {
-        this.imgBounding.height = Number(val) || this.imgBounding.height;
-        this.render();
+        let deltaHeight = Number(val) || this.imgBounding.height;
+        deltaHeight < 100 && (deltaHeight = 100); 
+        this.imgBounding.height = deltaHeight;
+        this.imgBounding.width = deltaHeight * this.ratio;
+    }
+    get imgOffsetX () {
+        return this.imgBounding.offsetX;
+    }
+    set imgOffsetX (val) {
+        const rightLine = this.canvas.width - this.canvas.width / 10;
+        const leftLine = -this.imgWidth + this.canvas.width / 10;
+        val = val > rightLine ? rightLine : (val < -this.imgWidth ? leftLine : val);
+
+        this.imgBounding.offsetX = val;
+    }
+    get imgOffsetY () {
+        return this.imgBounding.offsetY;
+    }
+    set imgOffsetY (val) {
+        const topLine =  this.canvas.height - this.canvas.height / 10;
+        const bottomLine = -this.imgHeight + this.canvas.height / 10;
+        val = val > this.canvas.height ? topLine : (val < -this.imgHeight ? bottomLine: val);
+
+        this.imgBounding.offsetY = val;
     }
     private _scale: number = 0;
     get scale () {
@@ -355,18 +369,9 @@ export default class GeeTailor {
         this.render()    
     }
 
-    private toBlob (data, type) {
-        return new Blob([data], {type});
-    }
-
-    private toUrl (obj) {
-        return URL.createObjectURL(obj);
-    }
-
-    public download () {
-
-        const width = this.canvas.width;
-        const height = this.canvas.height;
+    private createImg () {
+        const width = this.canvas.width / this.dpr;
+        const height = this.canvas.height / this.dpr;
         this.output.width = width;
         this.output.height = height;
         this.outCtx.beginPath();
@@ -393,10 +398,22 @@ export default class GeeTailor {
             width, 
             height
         );
+    }
+
+    public toBase64 () {
+        this.createImg();
+        return this.output.toDataURL();
+    }
+    public toBlob () {
+        this.createImg();
+        return this.output.toDataURL();
+    }
+    public download () {
+        this.createImg();
         const a = document.createElement('a');
         a.download = 'gt-img';
         this.output.toBlob(blob => {
-            a.href = this.toUrl(blob);
+            a.href = toUrl(blob);
             a.click();
         });
     }
