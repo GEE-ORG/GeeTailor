@@ -38,14 +38,21 @@
     </template>
 
     <div class="wrap"></div>
+    <img class="gt-preview" download="gt-img">
+    <button class="gt-ctrl_export">Export</button>
+    <button class="gt-ctrl_preview">Preview</button>
 
     <script src="../dist/GeeTailor.js"></script> 
     <script>
         console.log(1);
-        const gt = new GeeTailor('.wrap', {mode: 'avatar'});
-        // setTimeout(function() {
-        //     gt.mode = 'avatar';
-        // }, 2000);
+        const gt = new GeeTailor('.wrap', {mode: 'avatar', maskType: 'rect'});
+        const preview = document.querySelector('.gt-preview');
+        document.querySelector('.gt-ctrl_export').addEventListener('click', () => {
+            gt.download();
+        });
+        document.querySelector('.gt-ctrl_preview').addEventListener('click', () => {
+            preview.src = gt.toBase64();
+        });
     </script>
         
 </body>
