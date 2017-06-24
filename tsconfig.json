@@ -1,5 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es6"
-  }
+    "target": "es5",
+    "alwaysStrict": true,
+    "diagnostics": true,
+    "lib": ["es2015", "dom", "ES2015.Promise"]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

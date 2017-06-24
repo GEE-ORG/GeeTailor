@@ -1,15 +1,17 @@
 import { assign, nextTick, toBlob, toUrl } from './utils';
 
+type Mode = 'avatar' | 'free';
+type MaskType = 'circle' | 'rect';
 interface gtOption {
     width: number,
     height: number,
-    mode: 'avatar' | 'free',
-    maskType: 'circle' | 'rect'
+    mode: Mode,
+    maskType: MaskType
 };
 const defaultOption: gtOption = {
     width: 200,
     height: 200,
-    mode: 'avatar',
+    mode: 'free',
     maskType: 'circle' 
 }
 const template = `
@@ -275,7 +277,7 @@ export default class GeeTailor {
     get mode () {
         return this._mode;
     }
-    set mode (val: 'avatar' | 'free') {
+    set mode (val: Mode) {
         this._mode = val;
         switch (val) {
             case 'avatar': {
@@ -345,7 +347,7 @@ export default class GeeTailor {
         this.output.height = height;
         this.outCtx.beginPath();
 
-        let clipArea: [number, number, number, number];
+        let clipArea: Array<number>;
 
         if (this.mode === 'avatar') {
             if (this.option.maskType === 'circle') {
@@ -370,11 +372,9 @@ export default class GeeTailor {
                     width, 
                     height,
                 ];
-                // const imgAreaWidth = (this.canvas.width - this.rectMaskWidth * 2) / this.dpr;
-                // this.outCtx.rect(0, 0, width, width);
             }
         } 
-        
+
         (this.outCtx.drawImage as any)(this.canvas, ...clipArea);
 
         this.hasChanged = false;

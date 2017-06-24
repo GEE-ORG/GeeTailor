@@ -42,6 +42,11 @@
     <button class="gt-ctrl_export">Export</button>
     <button class="gt-ctrl_preview">Preview</button>
 
+    <div class="wrap1"></div>
+    <img class="gt-preview1" download="gt-img">
+    <button class="gt-ctrl_export1">Export</button>
+    <button class="gt-ctrl_preview1">Preview</button>
+
     <script src="../dist/GeeTailor.js"></script> 
     <script>
         console.log(1);
@@ -52,6 +57,15 @@
         });
         document.querySelector('.gt-ctrl_preview').addEventListener('click', () => {
             preview.src = gt.toBase64();
+        });
+
+        const gt1 = new GeeTailor('.wrap1', {width: 800, height: 400});
+        const preview1 = document.querySelector('.gt-preview1');
+        document.querySelector('.gt-ctrl_export1').addEventListener('click', () => {
+            gt1.download();
+        });
+        document.querySelector('.gt-ctrl_preview1').addEventListener('click', () => {
+            preview1.src = gt.toBase64();
         });
     </script>
         
