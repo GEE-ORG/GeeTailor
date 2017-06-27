@@ -9,11 +9,13 @@
     "node-sass": "^4.5.2",
     "rollup-plugin-node-resolve": "^3.0.0",
     "rollup-plugin-scss": "^0.2.0",
+    "rollup-plugin-typescript2": "^0.4.3",
     "rollup-plugin-uglify": "^1.0.1",
     "rollup-watch": "^3.2.2",
-    "uglify-js": "^2.8.22",
-    "rollup-plugin-typescript2": "^0.4.3",
-    "tslib": "^1.7.1",
-    "typescript": "^2.3.4"
+    "typescript": "^2.3.4",
+    "uglify-js": "^2.8.22"
+  },
+  "dependencies": {
+    "tslib": "^1.7.1"
   }
 }

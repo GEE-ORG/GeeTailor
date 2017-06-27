@@ -50,7 +50,7 @@
     <script src="../dist/GeeTailor.js"></script> 
     <script>
         console.log(1);
-        const gt = new GeeTailor('.wrap', {mode: 'avatar', maskType: 'rect'});
+        const gt = new GeeTailor('.wrap', {mode: 'avatar', maskType: 'circle'});
         const preview = document.querySelector('.gt-preview');
         document.querySelector('.gt-ctrl_export').addEventListener('click', () => {
             gt.download();
@@ -65,7 +65,7 @@
             gt1.download();
         });
         document.querySelector('.gt-ctrl_preview1').addEventListener('click', () => {
-            preview1.src = gt.toBase64();
+            preview1.src = gt1.toBase64();
         });
     </script>
         

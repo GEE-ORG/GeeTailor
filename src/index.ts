@@ -50,12 +50,15 @@ export default class GeeTailor {
     private outCtx: CanvasRenderingContext2D = this.output.getContext('2d');
 
     public upload: HTMLButtonElement;
-    public export: HTMLButtonElement;
 
     private rectMaskWidth = 0;
 
     private isMoving = false;
+    private isCropping = false;
     private hasChanged = true;
+
+    private mouseStartPoint = { x: 0, y: 0 };
+    private mouseEndPoint = { x: 0, y: 0 };
 
     private img: HTMLImageElement = new Image;
     private original = {
@@ -68,6 +71,12 @@ export default class GeeTailor {
         offsetX: 0,
         offsetY: 0
     };
+    private cropArea = {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0
+    }
 
     private _mode: 'avatar'|'free';
 
@@ -105,6 +114,13 @@ export default class GeeTailor {
                 this.rectMaskWidth = this.canvas.width / 10;
                 this.canvas.width += this.rectMaskWidth * 2;
                 this.canvas.height += this.rectMaskWidth * 2;
+            }
+        } else if (this.mode === 'free') {
+            this.cropArea = {
+                x: 0,
+                y: 0,
+                width: this.canvas.width,
+                height: this.canvas.height
             }
         }
 
@@ -153,13 +169,36 @@ export default class GeeTailor {
                 this.ctx.drawImage(this.svgMask, 0, 0, this.canvas.width, this.canvas.width);
             } else if (maskType === 'rect') {
                 const canvasWidth = this.canvas.width;
-                this.ctx.fillStyle = 'rgba(0,0,0,.5)';
-                this.ctx.fillRect(0, 0, canvasWidth, this.rectMaskWidth,);
-                this.ctx.fillRect(0, canvasWidth - this.rectMaskWidth, canvasWidth, this.rectMaskWidth);
-                this.ctx.fillRect(0, this.rectMaskWidth, this.rectMaskWidth, canvasWidth - this.rectMaskWidth * 2);
-                this.ctx.fillRect(canvasWidth - this.rectMaskWidth, this.rectMaskWidth, this.rectMaskWidth, this.canvas.height - this.rectMaskWidth * 2);
+                this.drawRectMask(
+                    this.rectMaskWidth, 
+                    this.rectMaskWidth, 
+                    canvasWidth - this.rectMaskWidth * 2,
+                    canvasWidth - this.rectMaskWidth * 2
+                );
             }
+        } else if (this.mode === 'free') {
+            const startPoint = JSON.parse(JSON.stringify(this.mouseStartPoint));
+            const endPoint = JSON.parse(JSON.stringify(this.mouseEndPoint));
+            console.log(startPoint, endPoint)
+            startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
+            startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
+            this.drawRectMask(
+                startPoint.x, 
+                startPoint.y, 
+                endPoint.x - startPoint.x, 
+                endPoint.y - startPoint.y
+            );
         }
+    }
+
+    private drawRectMask (x: number, y: number, width: number, height: number) {
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        this.ctx.fillStyle = 'rgba(0,0,0,.5)';
+        this.ctx.fillRect(0, 0, canvasWidth, y);
+        this.ctx.fillRect(0, y + height, canvasWidth, canvasHeight - (y + height));
+        this.ctx.fillRect(0, y, x, height);
+        this.ctx.fillRect(x + width, y, canvasWidth - (x + width), height);
     }
 
     private addEvents () {
@@ -187,6 +226,7 @@ export default class GeeTailor {
         const point = { x: 0, y: 0 };
         let isScaling = false;
         let isMoving = false;
+        let isCropping = false;
         document.addEventListener('wheel', e => {
 
             if (e.target !== this.canvas) return;
@@ -219,29 +259,44 @@ export default class GeeTailor {
         });
 
         const startPoints = { x: 0, y: 0 };
+        const endPoints = { x: 0, y: 0 };
         const imgOffset = { x: this.imgOffsetX, y: this.imgOffsetY };
         document.addEventListener('mousedown', e => {
             if (e.target !== this.canvas || isScaling) return;
 
-            isMoving = true;
-            document.body.style.cursor = 'move';
-            console.log(e);
-            startPoints.x = e.clientX;
-            startPoints.y = e.clientY;
+            if (e.metaKey === true || e.ctrlKey === true || this.mode === 'avatar') {
+                isMoving = true;
+                this.mouseStartPoint.x = e.clientX;
+                this.mouseStartPoint.y = e.clientY;
+                document.body.style.cursor = 'move';
+            } else {
+                isCropping = true;
+                this.mouseStartPoint.x = e.offsetX * this.dpr;
+                this.mouseStartPoint.y = e.offsetY * this.dpr;
+                document.body.style.cursor = 'crosshair';
+            }
         });
         document.addEventListener('mousemove', e => {
-            if (!isMoving || isScaling) return;
+            if ((!isMoving && !isCropping) || isScaling) return;
 
-            this.imgOffsetX += (e.clientX - startPoints.x) * this.dpr;
-            this.imgOffsetY += (e.clientY - startPoints.y) * this.dpr;
-            console.log(this.imgBounding.offsetX, this.imgBounding.offsetY, e.clientX, e.clientY,startPoints.x, startPoints.y);
-            startPoints.x = e.clientX;
-            startPoints.y = e.clientY;
+            // console.log(e);
+
+            if (isMoving) {
+                this.imgOffsetX += (e.clientX - this.mouseStartPoint.x) * this.dpr;
+                this.imgOffsetY += (e.clientY - this.mouseStartPoint.y) * this.dpr;
+
+                this.mouseStartPoint.x = e.clientX;
+                this.mouseStartPoint.y = e.clientY;
+            } else if (isCropping) {
+                this.mouseEndPoint.x = e.offsetX * this.dpr;
+                this.mouseEndPoint.y = e.offsetY * this.dpr;
+            }
 
             requestAnimationFrame(this.render.bind(this));
         });
         document.addEventListener('mouseup', e => {
             isMoving = false;
+            isCropping = false;
             document.body.style.cursor = 'auto';
         })
     }
@@ -341,8 +396,20 @@ export default class GeeTailor {
 
         if (!this.hasChanged) return;
 
-        const width = this.width;
-        const height = this.width;
+        let width = 0;
+        let height = 0;
+        const startPoint = JSON.parse(JSON.stringify(this.mouseStartPoint));
+        const endPoint = JSON.parse(JSON.stringify(this.mouseEndPoint));
+        if (this.mode === 'avatar') {
+            width = this.width;
+            height = this.width;
+        } else if (this.mode === 'free') {
+            console.log(startPoint, endPoint)
+            startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
+            startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
+            width = endPoint.x - startPoint.x;
+            height = endPoint.y - startPoint.y;
+        }
         this.output.width = width;
         this.output.height = height;
         this.outCtx.beginPath();
@@ -373,7 +440,18 @@ export default class GeeTailor {
                     height,
                 ];
             }
-        } 
+        } else if (this.mode === 'free') {
+            clipArea = [
+                startPoint.x, 
+                startPoint.y, 
+                endPoint.x - startPoint.x, 
+                endPoint.y - startPoint.y,
+                0,
+                0,
+                width, 
+                height,
+            ];
+        }
 
         (this.outCtx.drawImage as any)(this.canvas, ...clipArea);
 
