@@ -14,42 +14,38 @@
 
     <!--<link rel="stylesheet" href="style.css">-->
     <style>
-        template {
-            display: none;
+        body {
+            text-align: center;
+            margin: 0;
+            padding: 40px;
+        }
+        .gt {
+            margin-bottom: 40px;
+            background: #eee;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px #efe;
         }
     </style>
 
 </head>
 <body>
-
-    <template>
-
-    <div class="gt-canvas">
-        <canvas class="gt-img" style="background-color: rgba(0,0,0,.8)"></canvas>
-    </div>
-    <img class="gt-preview" style="display: none" download="gt-img">
-    <section class="gt-ctrl">
-        <button class="gt-ctrl_upload">Upload</button>
+    <div class="gt">
+        <div class="wrap"></div>
+        <img class="gt-preview">
         <button class="gt-ctrl_export">Export</button>
+        <button class="gt-ctrl_preview">Preview</button>
+    </div>
 
-        <input class="gt-upload" type="file" accept="image/jpg,image/png" style="display: none">
-    </section>
-
-    </template>
-
-    <div class="wrap"></div>
-    <img class="gt-preview" download="gt-img">
-    <button class="gt-ctrl_export">Export</button>
-    <button class="gt-ctrl_preview">Preview</button>
-
-    <div class="wrap1"></div>
-    <img class="gt-preview1" download="gt-img">
-    <button class="gt-ctrl_export1">Export</button>
-    <button class="gt-ctrl_preview1">Preview</button>
+    <div class="gt">
+        <div class="wrap1"></div>
+        <img class="gt-preview1">
+        <button class="gt-ctrl_export1">Export</button>
+        <button class="gt-ctrl_preview1">Preview</button>
+    </div>
 
     <script src="../dist/GeeTailor.js"></script> 
     <script>
-        console.log(1);
         const gt = new GeeTailor('.wrap', {mode: 'avatar', maskType: 'circle'});
         const preview = document.querySelector('.gt-preview');
         document.querySelector('.gt-ctrl_export').addEventListener('click', () => {

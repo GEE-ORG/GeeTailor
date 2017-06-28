@@ -56,9 +56,10 @@ export default class GeeTailor {
     private isMoving = false;
     private isCropping = false;
     private hasChanged = true;
+    private isScaling = false;
 
-    private mouseStartPoint = { x: 0, y: 0 };
-    private mouseEndPoint = { x: 0, y: 0 };
+    private cropStartPoint = { x: 0, y: 0 };
+    private cropEndPoint = { x: 0, y: 0 };
 
     private img: HTMLImageElement = new Image;
     private original = {
@@ -177,9 +178,9 @@ export default class GeeTailor {
                 );
             }
         } else if (this.mode === 'free') {
-            const startPoint = JSON.parse(JSON.stringify(this.mouseStartPoint));
-            const endPoint = JSON.parse(JSON.stringify(this.mouseEndPoint));
-            console.log(startPoint, endPoint)
+            const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
+            const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
+            // console.log(startPoint, endPoint)
             startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
             startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
             this.drawRectMask(
@@ -224,14 +225,12 @@ export default class GeeTailor {
         });
         let st;
         const point = { x: 0, y: 0 };
-        let isScaling = false;
-        let isMoving = false;
-        let isCropping = false;
+        
         document.addEventListener('wheel', e => {
 
             if (e.target !== this.canvas) return;
 
-            isScaling = true;
+            this.isScaling = true;
 
             st && clearTimeout(st);
 
@@ -244,8 +243,6 @@ export default class GeeTailor {
                 x: point.x * this.dpr - this.imgOffsetX,
                 y: point.y * this.dpr - this.imgOffsetY
             }
-
-            console.log(point, pointOnImg);
             
             this.imgWidth += deltaWidth;
 
@@ -254,51 +251,120 @@ export default class GeeTailor {
 
             requestAnimationFrame(this.render.bind(this));
             st = setTimeout(() => {
-                isScaling = false;
+                this.isScaling = false;
             }, 200);
         });
 
         const startPoints = { x: 0, y: 0 };
         const endPoints = { x: 0, y: 0 };
         const imgOffset = { x: this.imgOffsetX, y: this.imgOffsetY };
-        document.addEventListener('mousedown', e => {
-            if (e.target !== this.canvas || isScaling) return;
+        let isInCroppingArea = false;
+        let hasMoved = false;
+        const onMouseDown = mouseDown.bind(this);
+        const onMouseMove = mouseMove.bind(this);
+        // const onMouseUp = mouseUp.bind(this);
+        this.canvas.addEventListener('mousedown', e => {
+            console.log('canvas mousedown');
+            const point = { 
+                x: startPoints.x * this.dpr, 
+                y: startPoints.y * this.dpr
+            };
+            const area = {
+                start: this.cropStartPoint, 
+                end: this.cropEndPoint
+            };
+            isInCroppingArea = this.pointInArea(point, area);
+            if (!isInCroppingArea) {
+                this.cropStartX = 0;
+                this.cropStartY = 0;
+                this.cropEndX = 0;
+                this.cropEndY = 0;
+                this.render.bind(this);
+            }
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            // document.addEventListener('mouseup', onMouseUp);
+        });
+        this.canvas.addEventListener('mouseup', e => {
+            console.log('canvas mouseup');
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mousemove', onMouseMove);
+            // document.removeEventListener('mouseup', onMouseUp);
+            this.isMoving = false;
+            this.isCropping = false;
+            document.body.style.cursor = 'auto';
+            this.render.bind(this);
+        });
 
-            if (e.metaKey === true || e.ctrlKey === true || this.mode === 'avatar') {
-                isMoving = true;
-                this.mouseStartPoint.x = e.clientX;
-                this.mouseStartPoint.y = e.clientY;
+        function mouseDown (e) {
+            if (e.target !== this.canvas || this.isScaling) return;
+            console.log('document mousedown');
+
+            startPoints.x = e.offsetX;
+            startPoints.y = e.offsetY;
+
+            if (
+                e.metaKey === true || 
+                e.ctrlKey === true || 
+                this.mode === 'avatar' ||
+                isInCroppingArea
+            ) {
+                this.isMoving = true;
+                startPoints.x = e.clientX;
+                startPoints.y = e.clientY;
                 document.body.style.cursor = 'move';
             } else {
-                isCropping = true;
-                this.mouseStartPoint.x = e.offsetX * this.dpr;
-                this.mouseStartPoint.y = e.offsetY * this.dpr;
+                this.isCropping = true;
+                this.cropStartX = e.offsetX * this.dpr;
+                this.cropStartY = e.offsetY * this.dpr;
                 document.body.style.cursor = 'crosshair';
             }
-        });
-        document.addEventListener('mousemove', e => {
-            if ((!isMoving && !isCropping) || isScaling) return;
 
+            this.render.bind(this);
+        }
+        function mouseMove (e) {
+            if ((!this.isMoving && !this.isCropping) || this.isScaling) return;
+
+            hasMoved = true;
+            console.log('document mousemove');
             // console.log(e);
 
-            if (isMoving) {
-                this.imgOffsetX += (e.clientX - this.mouseStartPoint.x) * this.dpr;
-                this.imgOffsetY += (e.clientY - this.mouseStartPoint.y) * this.dpr;
-
-                this.mouseStartPoint.x = e.clientX;
-                this.mouseStartPoint.y = e.clientY;
-            } else if (isCropping) {
-                this.mouseEndPoint.x = e.offsetX * this.dpr;
-                this.mouseEndPoint.y = e.offsetY * this.dpr;
+            if (this.isMoving) {
+                const offsetX = (e.clientX - startPoints.x) * this.dpr;
+                const offsetY = (e.clientY - startPoints.y) * this.dpr;
+                if (isInCroppingArea) {
+                    this.cropStartX += offsetX;
+                    this.cropStartY += offsetY;
+                    this.cropEndX += offsetX;
+                    this.cropEndY += offsetY;
+                } else {
+                    this.imgOffsetX += offsetX;
+                    this.imgOffsetY += offsetY;
+                }
+                startPoints.x = e.clientX;
+                startPoints.y = e.clientY;
+                
+            } else if (this.isCropping) {
+                this.cropEndPoint.x = e.offsetX * this.dpr;
+                this.cropEndPoint.y = e.offsetY * this.dpr;
             }
 
             requestAnimationFrame(this.render.bind(this));
-        });
-        document.addEventListener('mouseup', e => {
-            isMoving = false;
-            isCropping = false;
-            document.body.style.cursor = 'auto';
-        })
+        }
+        // function mouseUp (e) {
+        //     this.isMoving = false;
+        //     this.isCropping = false;
+        //     console.log('document mouseup');
+        //     if (!hasMoved && !isInCroppingArea) {
+        //         this.cropStartX = 0;
+        //         this.cropStartY = 0;
+        //         this.cropEndX = 0;
+        //         this.cropEndY = 0;
+        //     }
+        //     document.body.style.cursor = 'auto';
+        // }
+
+        
     }
 
     private imgInit () {
@@ -327,6 +393,22 @@ export default class GeeTailor {
             offsetX: (this.canvas.width - width) / 2,
             offsetY: (this.canvas.height - height) / 2 
         }
+    }
+
+    private pointInArea(point: {x, y}, area: {start, end}): boolean {
+        const startPoint = JSON.parse(JSON.stringify(area.start));
+        const endPoint = JSON.parse(JSON.stringify(area.end));
+        startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
+        startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
+        if (
+            point.x >= startPoint.x &&
+            point.x <= endPoint.x &&
+            point.y >= startPoint.y &&
+            point.y <= endPoint.y
+        ) {
+            return true;
+        }
+        return false;
     }
 
     get mode () {
@@ -391,6 +473,35 @@ export default class GeeTailor {
         this.imgBounding.offsetY = val;
         this.hasChanged = true;
     }
+    get cropStartX () {
+        return this.cropStartPoint.x;
+    }
+    set cropStartX (val) {
+        this.cropStartPoint.x = Number(val) || 0;
+        this.hasChanged = true;
+    }
+    get cropStartY () {
+        return this.cropStartPoint.y;
+    }
+    set cropStartY (val) {
+        this.cropStartPoint.y = Number(val) || 0;
+        this.hasChanged = true;
+    }
+    get cropEndX () {
+        return this.cropEndPoint.x;
+    }
+    set cropEndX (val) {
+        this.cropEndPoint.x = Number(val) || 0;
+        this.hasChanged = true;
+    }
+    get cropEndY () {
+        return this.cropEndPoint.y;
+    }
+    set cropEndY (val) {
+        this.cropEndPoint.y = Number(val) || 0;
+        this.hasChanged = true;
+    }
+    
 
     private createImg () {
 
@@ -398,8 +509,8 @@ export default class GeeTailor {
 
         let width = 0;
         let height = 0;
-        const startPoint = JSON.parse(JSON.stringify(this.mouseStartPoint));
-        const endPoint = JSON.parse(JSON.stringify(this.mouseEndPoint));
+        const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
+        const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
         if (this.mode === 'avatar') {
             width = this.width;
             height = this.width;
