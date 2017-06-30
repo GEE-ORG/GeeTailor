@@ -6,13 +6,15 @@ interface gtOption {
     width: number,
     height: number,
     mode: Mode,
-    maskType: MaskType
+    maskType: MaskType,
+    resizable: boolean
 };
 const defaultOption: gtOption = {
     width: 200,
     height: 200,
     mode: 'free',
-    maskType: 'circle' 
+    maskType: 'circle',
+    resizable: true
 }
 const template = `
 <div class="gt-canvas" style="display: inline-block">
@@ -54,6 +56,7 @@ export default class GeeTailor {
     private rectMaskWidth = 0;
 
     private isMoving = false;
+    private isMovingCrop = false;
     private isCropping = false;
     private hasChanged = true;
     private isScaling = false;
@@ -79,6 +82,7 @@ export default class GeeTailor {
         width: 0,
         height: 0
     }
+    private resizeCtrlWidth = 5 * this.dpr;
 
     private _mode: 'avatar'|'free';
 
@@ -201,6 +205,22 @@ export default class GeeTailor {
         this.ctx.fillRect(0, y + height, canvasWidth, canvasHeight - (y + height));
         this.ctx.fillRect(0, y, x, height);
         this.ctx.fillRect(x + width, y, canvasWidth - (x + width), height);
+
+        if (this.option.resizable && width > 0 && height > 0) {
+            const resizeWidth = this.resizeCtrlWidth;
+            this.ctx.fillStyle = '#fff';
+
+            this.ctx.fillRect(x - resizeWidth, y - resizeWidth, resizeWidth, resizeWidth); // top left
+            this.ctx.fillRect(x + width, y - resizeWidth, resizeWidth, resizeWidth); // top right
+            this.ctx.fillRect(x - resizeWidth, y + height, resizeWidth, resizeWidth); // bottom left
+            this.ctx.fillRect(x + width, y + height, resizeWidth, resizeWidth); // bottom right
+
+            const halfWidth = resizeWidth / 2;
+            this.ctx.fillRect((width / 2) + x - halfWidth, y - resizeWidth, resizeWidth, resizeWidth); // top center
+            this.ctx.fillRect((width / 2) + x - halfWidth, y + height, resizeWidth, resizeWidth); // bottom center
+            this.ctx.fillRect(x - resizeWidth, (height / 2) + y - halfWidth, resizeWidth, resizeWidth); // center left
+            this.ctx.fillRect(x + width, (height / 2) + y - halfWidth, resizeWidth, resizeWidth); // center right
+        }
     }
 
     private uploadEvents () {
@@ -307,6 +327,9 @@ export default class GeeTailor {
                 startPoints.x = e.clientX;
                 startPoints.y = e.clientY;
                 document.body.style.cursor = 'move';
+                if (isInCroppingArea) {
+                    this.isMovingCrop = true;
+                }
             } else {
                 this.isCropping = true;
                 this.cropStartX = e.offsetX * this.dpr;
@@ -339,6 +362,8 @@ export default class GeeTailor {
                 document.body.style.cursor = 'auto';
             }
 
+            console.log(this.getResizeCtrl(e));
+
             if ((!this.isMoving && !this.isCropping) || this.isScaling) return;
 
             // console.log('document mousemove');
@@ -346,7 +371,7 @@ export default class GeeTailor {
             if (this.isMoving) {
                 const offsetX = (e.clientX - startPoints.x) * this.dpr;
                 const offsetY = (e.clientY - startPoints.y) * this.dpr;
-                if (isInCroppingArea && !isMovingWholeImg) {
+                if (this.isMovingCrop) {
                     this.cropStartX += offsetX;
                     this.cropStartY += offsetY;
                     this.cropEndX += offsetX;
@@ -374,10 +399,9 @@ export default class GeeTailor {
                 this.cropEndX = e.offsetX * this.dpr;
                 this.cropEndY = e.offsetY * this.dpr;
             }
-            console.log('isCropping', this.isCropping, this.cropStartPoint, this.cropEndPoint);
             this.isMoving = false;
             this.isCropping = false;
-            console.log('document mouseup');
+            this.isMovingCrop = false;
             document.body.style.cursor = 'auto';
             this.render();
         }
@@ -421,7 +445,7 @@ export default class GeeTailor {
         }
     }
 
-    private pointInArea(point: {x, y}, area: {start, end}): boolean {
+    private pointInArea(point: {x, y}, area: {start: {x, y}, end: {x, y}}): boolean {
         const startPoint = JSON.parse(JSON.stringify(area.start));
         const endPoint = JSON.parse(JSON.stringify(area.end));
         startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
@@ -435,6 +459,63 @@ export default class GeeTailor {
             return true;
         }
         return false;
+    }
+
+    private getResizeCtrl (e) {
+        const ctrl = {
+            isInCtrl: false,
+            position: ''
+        };
+        const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
+        const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
+        const x = startPoint.x;
+        const y = startPoint.y; 
+        const width = endPoint.x - startPoint.x;
+        const height = endPoint.y - startPoint.y
+        const resizeWidth = this.resizeCtrlWidth;
+        const halfWidth = resizeWidth / 2;
+        const areas = {
+            'top': {
+                'left': [x - resizeWidth, y - resizeWidth],
+                'center': [(width / 2) + x - halfWidth, y - resizeWidth],
+                'right': [x + width, y - resizeWidth]
+            },
+            'center': {
+                'left': [x - resizeWidth, (height / 2) + y - halfWidth],
+                'right': [x + width, (height / 2) + y - halfWidth]
+            },
+            'bottom': {
+                'left': [x - resizeWidth, y + height],
+                'center': [(width / 2) + x - halfWidth, y + height],
+                'right': [x + width, y + height]
+            }
+        }
+        console.dir(areas, e.offsetX * this.dpr, e.offsetX * this.dpr);
+
+        Object.keys(areas).forEach(rowKey => {
+            if (ctrl.isInCtrl) return;
+            Object.keys(areas[rowKey]).forEach(colKey => {
+                if (ctrl.isInCtrl) return;
+                const point = areas[rowKey][colKey];
+                const pointer = {x: e.offsetX * this.dpr, y: e.offsetX * this.dpr};
+                const area = {
+                    start: {
+                        x: point[0],
+                        y: point[1]
+                    },
+                    end: {
+                        x: point[0] + this.resizeCtrlWidth,
+                        y: point[1] + this.resizeCtrlWidth
+                    }
+                }
+                if (this.pointInArea(pointer, area)) {
+                    ctrl.isInCtrl = true;
+                    ctrl.position = `${rowKey}-${colKey}`;
+                }
+            });
+        });
+
+        return ctrl;
     }
 
     get mode () {
