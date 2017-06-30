@@ -57,6 +57,7 @@ export default class GeeTailor {
     private isCropping = false;
     private hasChanged = true;
     private isScaling = false;
+    private canvasNotBlank = false;
 
     private cropStartPoint = { x: 0, y: 0 };
     private cropEndPoint = { x: 0, y: 0 };
@@ -202,7 +203,7 @@ export default class GeeTailor {
         this.ctx.fillRect(x + width, y, canvasWidth - (x + width), height);
     }
 
-    private addEvents () {
+    private uploadEvents () {
         this.btns['upload'].addEventListener('click', () => {
             this.upload.click();
         });
@@ -223,9 +224,10 @@ export default class GeeTailor {
             this.img.src = imgUrl;
         
         });
+    }
+    private scrollEvent () {
         let st;
         const point = { x: 0, y: 0 };
-        
         document.addEventListener('wheel', e => {
 
             if (e.target !== this.canvas) return;
@@ -254,6 +256,11 @@ export default class GeeTailor {
                 this.isScaling = false;
             }, 200);
         });
+    }
+    private addEvents () {
+        
+        this.uploadEvents();
+        this.scrollEvent();
 
         const startPoints = { x: 0, y: 0 };
         const endPoints = { x: 0, y: 0 };
@@ -262,9 +269,24 @@ export default class GeeTailor {
         let hasMoved = false;
         const onMouseDown = mouseDown.bind(this);
         const onMouseMove = mouseMove.bind(this);
-        // const onMouseUp = mouseUp.bind(this);
-        this.canvas.addEventListener('mousedown', e => {
-            console.log('canvas mousedown');
+        const onMouseUp = mouseUp.bind(this);
+        const self = this;
+
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        function mouseDown (e) {
+            if (
+                e.target !== this.canvas || 
+                this.isScaling || 
+                !this.canvasNotBlank
+            ) return;
+            console.log('document mousedown');
+
+            startPoints.x = e.offsetX;
+            startPoints.y = e.offsetY;
+
             const point = { 
                 x: startPoints.x * this.dpr, 
                 y: startPoints.y * this.dpr
@@ -274,34 +296,6 @@ export default class GeeTailor {
                 end: this.cropEndPoint
             };
             isInCroppingArea = this.pointInArea(point, area);
-            if (!isInCroppingArea) {
-                this.cropStartX = 0;
-                this.cropStartY = 0;
-                this.cropEndX = 0;
-                this.cropEndY = 0;
-                this.render.bind(this);
-            }
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            // document.addEventListener('mouseup', onMouseUp);
-        });
-        this.canvas.addEventListener('mouseup', e => {
-            console.log('canvas mouseup');
-            document.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('mousemove', onMouseMove);
-            // document.removeEventListener('mouseup', onMouseUp);
-            this.isMoving = false;
-            this.isCropping = false;
-            document.body.style.cursor = 'auto';
-            this.render.bind(this);
-        });
-
-        function mouseDown (e) {
-            if (e.target !== this.canvas || this.isScaling) return;
-            console.log('document mousedown');
-
-            startPoints.x = e.offsetX;
-            startPoints.y = e.offsetY;
 
             if (
                 e.metaKey === true || 
@@ -317,22 +311,42 @@ export default class GeeTailor {
                 this.isCropping = true;
                 this.cropStartX = e.offsetX * this.dpr;
                 this.cropStartY = e.offsetY * this.dpr;
-                document.body.style.cursor = 'crosshair';
             }
-
-            this.render.bind(this);
         }
         function mouseMove (e) {
+
+            if (
+                e.target !== this.canvas || 
+                !this.canvasNotBlank
+            ) return;
+
+            const point = { 
+                x: e.offsetX * this.dpr, 
+                y: e.offsetY * this.dpr
+            };
+            const area = {
+                start: this.cropStartPoint, 
+                end: this.cropEndPoint
+            };
+            const isMovingWholeImg = movingWholeImg(e);
+            isInCroppingArea = this.pointInArea(point, area);
+
+            if (this.isCropping) {
+                document.body.style.cursor = 'crosshair';
+            } else if (isMovingWholeImg || isInCroppingArea) {
+                document.body.style.cursor = 'move';
+            } else {
+                document.body.style.cursor = 'auto';
+            }
+
             if ((!this.isMoving && !this.isCropping) || this.isScaling) return;
 
-            hasMoved = true;
-            console.log('document mousemove');
-            // console.log(e);
+            // console.log('document mousemove');
 
             if (this.isMoving) {
                 const offsetX = (e.clientX - startPoints.x) * this.dpr;
                 const offsetY = (e.clientY - startPoints.y) * this.dpr;
-                if (isInCroppingArea) {
+                if (isInCroppingArea && !isMovingWholeImg) {
                     this.cropStartX += offsetX;
                     this.cropStartY += offsetY;
                     this.cropEndX += offsetX;
@@ -351,18 +365,28 @@ export default class GeeTailor {
 
             requestAnimationFrame(this.render.bind(this));
         }
-        // function mouseUp (e) {
-        //     this.isMoving = false;
-        //     this.isCropping = false;
-        //     console.log('document mouseup');
-        //     if (!hasMoved && !isInCroppingArea) {
-        //         this.cropStartX = 0;
-        //         this.cropStartY = 0;
-        //         this.cropEndX = 0;
-        //         this.cropEndY = 0;
-        //     }
-        //     document.body.style.cursor = 'auto';
-        // }
+        function mouseUp (e) {
+            if (
+                e.target !== this.canvas || 
+                !this.canvasNotBlank
+            ) return;
+            if (this.isCropping) {
+                this.cropEndX = e.offsetX * this.dpr;
+                this.cropEndY = e.offsetY * this.dpr;
+            }
+            console.log('isCropping', this.isCropping, this.cropStartPoint, this.cropEndPoint);
+            this.isMoving = false;
+            this.isCropping = false;
+            console.log('document mouseup');
+            document.body.style.cursor = 'auto';
+            this.render();
+        }
+
+        function movingWholeImg (e) {
+            return  e.metaKey === true || 
+                    e.ctrlKey === true || 
+                    self.mode === 'avatar';
+        }
 
         
     }
@@ -384,7 +408,9 @@ export default class GeeTailor {
 
         this.imgOffsetX = (this.canvas.width - this.imgWidth) / 2;
         this.imgOffsetY =  (this.canvas.height - this.imgHeight) / 2;
-        
+
+        this.canvasNotBlank = true;
+
         this.render();
     }
 
