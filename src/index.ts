@@ -2,6 +2,10 @@ import { assign, nextTick, toBlob, toUrl } from './utils';
 
 type Mode = 'avatar' | 'free';
 type MaskType = 'circle' | 'rect';
+interface ctrlState {
+    isInCtrl: boolean, 
+    position: 'n'|'e'|'w'|'s'|'nw'|'ne'|'se'|'sw'
+};
 interface gtOption {
     width: number,
     height: number,
@@ -24,6 +28,7 @@ const template = `
     <div class="gt-info">
         <span class="gt-info_size"></span>
         <span class="gt-info_color"></span>
+        <span class="gt-info_position"></span>
     </div>
 </div>
 `;
@@ -98,6 +103,7 @@ export default class GeeTailor {
         this.wrapper = this.el.querySelector('.gt-canvas') as HTMLElement;
         this.info['size'] = this.el.querySelector('.gt-info_size') as HTMLElement;
         this.info['color'] = this.el.querySelector('.gt-info_color') as HTMLElement;
+        this.info['position'] = this.el.querySelector('.gt-info_position') as HTMLElement;
         this.canvas = this.el.querySelector('.gt-img') as HTMLCanvasElement;
         this.upload = this.el.querySelector('.gt-upload') as HTMLButtonElement;
         this.btns['upload'] = this.el.querySelector('.gt-ctrl_upload') as HTMLButtonElement;
@@ -286,7 +292,6 @@ export default class GeeTailor {
         const endPoints = { x: 0, y: 0 };
         const imgOffset = { x: this.imgOffsetX, y: this.imgOffsetY };
         let isInCroppingArea = false;
-        let hasMoved = false;
         const onMouseDown = mouseDown.bind(this);
         const onMouseMove = mouseMove.bind(this);
         const onMouseUp = mouseUp.bind(this);
@@ -338,10 +343,7 @@ export default class GeeTailor {
         }
         function mouseMove (e) {
 
-            if (
-                e.target !== this.canvas || 
-                !this.canvasNotBlank
-            ) return;
+            if (!this.canvasNotBlank) return;
 
             const point = { 
                 x: e.offsetX * this.dpr, 
@@ -354,15 +356,27 @@ export default class GeeTailor {
             const isMovingWholeImg = movingWholeImg(e);
             isInCroppingArea = this.pointInArea(point, area);
 
+            this.info.position.innerText = JSON.stringify(point);
+
+            const ctrlState: ctrlState = this.getResizeCtrl(e);
             if (this.isCropping) {
                 document.body.style.cursor = 'crosshair';
             } else if (isMovingWholeImg || isInCroppingArea) {
                 document.body.style.cursor = 'move';
+            } else if (ctrlState.isInCtrl) {
+                switch (ctrlState.position) {
+                    case 'n':
+                    case 's': document.body.style.cursor = 'ns-resize'; break;
+                    case 'e':
+                    case 'w': document.body.style.cursor = 'ew-resize'; break;
+                    case 'nw':
+                    case 'se': document.body.style.cursor = 'nwse-resize'; break;
+                    case 'ne':
+                    case 'sw': document.body.style.cursor = 'nesw-resize'; break;
+                }
             } else {
                 document.body.style.cursor = 'auto';
             }
-
-            console.log(this.getResizeCtrl(e));
 
             if ((!this.isMoving && !this.isCropping) || this.isScaling) return;
 
@@ -371,7 +385,7 @@ export default class GeeTailor {
             if (this.isMoving) {
                 const offsetX = (e.clientX - startPoints.x) * this.dpr;
                 const offsetY = (e.clientY - startPoints.y) * this.dpr;
-                if (this.isMovingCrop) {
+                if (this.isMovingCrop && !isMovingWholeImg) {
                     this.cropStartX += offsetX;
                     this.cropStartY += offsetY;
                     this.cropEndX += offsetX;
@@ -392,8 +406,9 @@ export default class GeeTailor {
         }
         function mouseUp (e) {
             if (
-                e.target !== this.canvas || 
-                !this.canvasNotBlank
+                !this.canvasNotBlank ||
+                (!this.isMoving && !this.isCropping) || 
+                this.isScaling
             ) return;
             if (this.isCropping) {
                 this.cropEndX = e.offsetX * this.dpr;
@@ -461,10 +476,11 @@ export default class GeeTailor {
         return false;
     }
 
-    private getResizeCtrl (e) {
-        const ctrl = {
+    
+    private getResizeCtrl (e): ctrlState {
+        const ctrl: ctrlState = {
             isInCtrl: false,
-            position: ''
+            position: '' as any
         };
         const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
         const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
@@ -474,47 +490,44 @@ export default class GeeTailor {
         const height = endPoint.y - startPoint.y
         const resizeWidth = this.resizeCtrlWidth;
         const halfWidth = resizeWidth / 2;
+        /**
+         *   n
+         * w   e
+         *   s
+         */
         const areas = {
-            'top': {
-                'left': [x - resizeWidth, y - resizeWidth],
-                'center': [(width / 2) + x - halfWidth, y - resizeWidth],
-                'right': [x + width, y - resizeWidth]
-            },
-            'center': {
-                'left': [x - resizeWidth, (height / 2) + y - halfWidth],
-                'right': [x + width, (height / 2) + y - halfWidth]
-            },
-            'bottom': {
-                'left': [x - resizeWidth, y + height],
-                'center': [(width / 2) + x - halfWidth, y + height],
-                'right': [x + width, y + height]
-            }
-        }
-        console.dir(areas, e.offsetX * this.dpr, e.offsetX * this.dpr);
+            n: [(width / 2) + x - halfWidth, y - resizeWidth],
+            e: [x + width, (height / 2) + y - halfWidth],
+            w: [x - resizeWidth, (height / 2) + y - halfWidth],
+            s: [(width / 2) + x - halfWidth, y + height],
+            nw: [x - resizeWidth, y - resizeWidth],
+            ne: [x + width, y - resizeWidth],
+            se: [x + width, y + height],
+            sw: [x - resizeWidth, y + height],
+        }   
 
-        Object.keys(areas).forEach(rowKey => {
+        const pointer = {x: e.offsetX * this.dpr, y: e.offsetY * this.dpr};
+
+        Object.keys(areas).forEach(dir => {
             if (ctrl.isInCtrl) return;
-            Object.keys(areas[rowKey]).forEach(colKey => {
-                if (ctrl.isInCtrl) return;
-                const point = areas[rowKey][colKey];
-                const pointer = {x: e.offsetX * this.dpr, y: e.offsetX * this.dpr};
-                const area = {
-                    start: {
-                        x: point[0],
-                        y: point[1]
-                    },
-                    end: {
-                        x: point[0] + this.resizeCtrlWidth,
-                        y: point[1] + this.resizeCtrlWidth
-                    }
+            const point = areas[dir];
+            const area = {
+                start: {
+                    x: point[0],
+                    y: point[1]
+                },
+                end: {
+                    x: point[0] + this.resizeCtrlWidth,
+                    y: point[1] + this.resizeCtrlWidth
                 }
-                if (this.pointInArea(pointer, area)) {
-                    ctrl.isInCtrl = true;
-                    ctrl.position = `${rowKey}-${colKey}`;
-                }
-            });
+            }
+            if (this.pointInArea(pointer, area)) {
+                ctrl.isInCtrl = true;
+                ctrl.position = `${dir}` as any;
+            }
         });
 
+        this.info['position'].innerText += ' CTRL: [' + ctrl.position + ']' + JSON.stringify(pointer);
         return ctrl;
     }
 
