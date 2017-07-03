@@ -1,4 +1,11 @@
-import { assign, nextTick, toBlob, toUrl } from './utils';
+import { 
+    assign, 
+    nextTick, 
+    toBlob, 
+    toUrl, 
+    pointInArea,
+    setCursor
+} from './utils';
 
 type Mode = 'avatar' | 'free';
 type MaskType = 'circle' | 'rect';
@@ -41,6 +48,7 @@ export default class GeeTailor {
 
     public el: Element;
     public option: any;
+    public name = 'GeeTailor';
 
     public width: number;
     public height: number;
@@ -320,7 +328,7 @@ export default class GeeTailor {
                 start: this.cropStartPoint, 
                 end: this.cropEndPoint
             };
-            isInCroppingArea = this.pointInArea(point, area);
+            isInCroppingArea = pointInArea(point, area);
 
             if (
                 e.metaKey === true || 
@@ -331,7 +339,7 @@ export default class GeeTailor {
                 this.isMoving = true;
                 startPoints.x = e.clientX;
                 startPoints.y = e.clientY;
-                document.body.style.cursor = 'move';
+                setCursor('move');
                 if (isInCroppingArea) {
                     this.isMovingCrop = true;
                 }
@@ -343,7 +351,11 @@ export default class GeeTailor {
         }
         function mouseMove (e) {
 
-            if (!this.canvasNotBlank) return;
+            e.preventDefault();
+
+            if (!this.canvasNotBlank ) {
+                return;
+            }
 
             const point = { 
                 x: e.offsetX * this.dpr, 
@@ -354,31 +366,31 @@ export default class GeeTailor {
                 end: this.cropEndPoint
             };
             const isMovingWholeImg = movingWholeImg(e);
-            isInCroppingArea = this.pointInArea(point, area);
-
-            this.info.position.innerText = JSON.stringify(point);
+            isInCroppingArea = pointInArea(point, area);
 
             const ctrlState: ctrlState = this.getResizeCtrl(e);
             if (this.isCropping) {
-                document.body.style.cursor = 'crosshair';
+                setCursor('crosshair');
             } else if (isMovingWholeImg || isInCroppingArea) {
-                document.body.style.cursor = 'move';
+                setCursor('move');
             } else if (ctrlState.isInCtrl) {
                 switch (ctrlState.position) {
                     case 'n':
-                    case 's': document.body.style.cursor = 'ns-resize'; break;
+                    case 's': setCursor('ns-resize'); break;
                     case 'e':
-                    case 'w': document.body.style.cursor = 'ew-resize'; break;
+                    case 'w': setCursor('ew-resize'); break;
                     case 'nw':
-                    case 'se': document.body.style.cursor = 'nwse-resize'; break;
+                    case 'se': setCursor('nwse-resize'); break;
                     case 'ne':
-                    case 'sw': document.body.style.cursor = 'nesw-resize'; break;
+                    case 'sw': setCursor('nesw-resize'); break;
                 }
             } else {
-                document.body.style.cursor = 'auto';
+                setCursor('auto');
             }
 
             if ((!this.isMoving && !this.isCropping) || this.isScaling) return;
+
+            this.info.position.innerText = JSON.stringify(point);
 
             // console.log('document mousemove');
 
@@ -417,14 +429,14 @@ export default class GeeTailor {
             this.isMoving = false;
             this.isCropping = false;
             this.isMovingCrop = false;
-            document.body.style.cursor = 'auto';
+            setCursor('auto');
             this.render();
         }
 
         function movingWholeImg (e) {
-            return  e.metaKey === true || 
+            return  (e.metaKey === true || 
                     e.ctrlKey === true || 
-                    self.mode === 'avatar';
+                    self.mode === 'avatar') && e.target === self.canvas;
         }
 
         
@@ -459,23 +471,6 @@ export default class GeeTailor {
             offsetY: (this.canvas.height - height) / 2 
         }
     }
-
-    private pointInArea(point: {x, y}, area: {start: {x, y}, end: {x, y}}): boolean {
-        const startPoint = JSON.parse(JSON.stringify(area.start));
-        const endPoint = JSON.parse(JSON.stringify(area.end));
-        startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
-        startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
-        if (
-            point.x >= startPoint.x &&
-            point.x <= endPoint.x &&
-            point.y >= startPoint.y &&
-            point.y <= endPoint.y
-        ) {
-            return true;
-        }
-        return false;
-    }
-
     
     private getResizeCtrl (e): ctrlState {
         const ctrl: ctrlState = {
@@ -521,13 +516,13 @@ export default class GeeTailor {
                     y: point[1] + this.resizeCtrlWidth
                 }
             }
-            if (this.pointInArea(pointer, area)) {
+            if (pointInArea(pointer, area)) {
                 ctrl.isInCtrl = true;
                 ctrl.position = `${dir}` as any;
             }
         });
 
-        this.info['position'].innerText += ' CTRL: [' + ctrl.position + ']' + JSON.stringify(pointer);
+        // this.info['position'].innerText += ' CTRL: [' + ctrl.position + ']' + JSON.stringify(pointer);
         return ctrl;
     }
 

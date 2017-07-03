@@ -65,3 +65,34 @@ export function toBlob (data, type): Blob {
 export function toUrl (obj): string {
     return URL.createObjectURL(obj);
 }
+
+interface coordinate {
+    x: number, 
+    y: number
+}
+export function pointInArea(
+    point: coordinate, 
+    area: {
+        start: coordinate, 
+        end: coordinate
+    }
+): boolean {
+    const startPoint = JSON.parse(JSON.stringify(area.start));
+    const endPoint = JSON.parse(JSON.stringify(area.end));
+    startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
+    startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
+    if (
+        point.x >= startPoint.x &&
+        point.x <= endPoint.x &&
+        point.y >= startPoint.y &&
+        point.y <= endPoint.y
+    ) {
+        return true;
+    }
+    return false;
+}
+
+
+export function setCursor (cursor?: string) {
+    document.body.style.cursor = cursor || 'auto';
+}
