@@ -32,7 +32,7 @@ const template = `
     <canvas class="gt-img" style="background-color: rgba(0,0,0,.8)"></canvas>
     <input class="gt-upload" type="file" accept="image/jpg,image/png" style="display: none">
     <button class="gt-ctrl_upload">Upload</button>
-    <div class="gt-info" style="position: fixed; display: none">
+    <div class="gt-info" style="position: fixed; top: 0; left: 0; display: none; background: #333; border-radius: 3px; font-size: 12px; padding: 2px 5px; color: #eee">
         <span class="gt-info_size"></span>
         <span class="gt-info_color"></span>
         <span class="gt-info_position"></span>
@@ -405,9 +405,8 @@ export default class GeeTailor {
 
             if (e.target === this.canvas) {
                 infoElement.style.display = 'inline-block';
-                infoElement.style.left = e.clientX + 20 + 'px';
-                infoElement.style.top = e.clientY + 20 + 'px';
-                this.info.position.innerText = `x: ${point.x} y: ${point.y}`;
+                infoElement.style.transform = `translate(${e.clientX + 20}px, ${e.clientY + 20}px)`;
+                this.info.position.innerText = `x: ${point.x / this.dpr} y: ${point.y / this.dpr}`;
             } else {
                 infoElement.style.display = 'none';
             }
