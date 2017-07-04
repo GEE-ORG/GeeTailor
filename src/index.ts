@@ -32,7 +32,7 @@ const template = `
     <canvas class="gt-img" style="background-color: rgba(0,0,0,.8)"></canvas>
     <input class="gt-upload" type="file" accept="image/jpg,image/png" style="display: none">
     <button class="gt-ctrl_upload">Upload</button>
-    <div class="gt-info">
+    <div class="gt-info" style="position: fixed; display: none">
         <span class="gt-info_size"></span>
         <span class="gt-info_color"></span>
         <span class="gt-info_position"></span>
@@ -118,8 +118,9 @@ export default class GeeTailor {
         this.btns['upload'] = this.el.querySelector('.gt-ctrl_upload') as HTMLButtonElement;
 
         this.ctx = this.canvas.getContext('2d');
-        // this.ctx.scale(this.dpr, this.dpr);
+        // this.ctx.scale(1 / this.dpr, 1/ this.dpr);
         // this.ctx.imageSmoothingEnabled = false;
+        this.outCtx.scale(this.dpr, this.dpr);
 
         this.mode = this.option.mode;
         this.canvasInit();
@@ -306,6 +307,7 @@ export default class GeeTailor {
         const onMouseMove = mouseMove.bind(this);
         const onMouseUp = mouseUp.bind(this);
         const self = this;
+        const infoElement = this.wrapper.querySelector('.gt-info') as HTMLDivElement;
 
         document.addEventListener('mousedown', onMouseDown);
         document.addEventListener('mousemove', onMouseMove);
@@ -401,9 +403,17 @@ export default class GeeTailor {
                 setCursor('auto');
             }
 
-            if ((!this.isMoving && !this.isCropping && !this.isResizing) || this.isScaling) return;
+            if (e.target === this.canvas) {
+                infoElement.style.display = 'inline-block';
+                infoElement.style.left = e.clientX + 20 + 'px';
+                infoElement.style.top = e.clientY + 20 + 'px';
+                this.info.position.innerText = `x: ${point.x} y: ${point.y}`;
+            } else {
+                infoElement.style.display = 'none';
+            }
+            
 
-            this.info.position.innerText = JSON.stringify(point);
+            if ((!this.isMoving && !this.isCropping && !this.isResizing) || this.isScaling) return;
 
             const offsetX = (e.clientX - startPoints.x) * this.dpr;
             const offsetY = (e.clientY - startPoints.y) * this.dpr;
@@ -503,6 +513,20 @@ export default class GeeTailor {
         };
         const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
         const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
+        let flipSideWays = false;
+        let flipVertically = false;
+
+        // If cropping area is flipped sideways
+        if (startPoint.x > endPoint.x) {
+            [startPoint.x, endPoint.x] = [endPoint.x, startPoint.x];
+            flipSideWays = true;
+        }
+        // If cropping area is flipped vertically
+        if (startPoint.y > endPoint.y) {
+            [startPoint.y, endPoint.y] = [endPoint.y, startPoint.y];
+            flipVertically = true;
+        }
+        
         const x = startPoint.x;
         const y = startPoint.y; 
         const width = endPoint.x - startPoint.x;
@@ -524,6 +548,39 @@ export default class GeeTailor {
             se: [x + width, y + height],
             sw: [x - resizeWidth, y + height],
         }   
+
+        /**
+         *   n      n
+         *  w e -> e w
+         *   s      s
+         */
+        if (flipSideWays) {
+            [
+                areas.e, areas.w, 
+                areas.ne, areas.nw, 
+                areas.se, areas.sw
+            ] = [
+                areas.w, areas.e, 
+                areas.nw, areas.ne,
+                areas.sw, areas.se
+            ];
+        }
+        /**
+         *   n      s
+         *  w e -> w e
+         *   s      n
+         */
+        if (flipVertically) {
+            [
+                areas.s, areas.n, 
+                areas.nw, areas.sw,
+                areas.ne, areas.se
+            ] = [
+                areas.n, areas.s, 
+                areas.sw, areas.nw,
+                areas.se, areas.ne
+            ];
+        }
 
         const pointer = {x: e.offsetX * this.dpr, y: e.offsetY * this.dpr};
 
@@ -658,8 +715,8 @@ export default class GeeTailor {
             console.log(startPoint, endPoint)
             startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
             startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
-            width = endPoint.x - startPoint.x;
-            height = endPoint.y - startPoint.y;
+            width = (endPoint.x - startPoint.x) / this.dpr;
+            height = (endPoint.y - startPoint.y) / this.dpr;
         }
         this.output.width = width;
         this.output.height = height;
@@ -671,14 +728,23 @@ export default class GeeTailor {
             if (this.option.maskType === 'circle') {
                 this.outCtx.arc(
                     width / 2,
-                    height / 2,
+                    width / 2,
                     width / 2,
                     0,
                     2 * Math.PI,
                     true
                 );
                 this.outCtx.clip();
-                clipArea = [0, 0, width, height];
+                clipArea = [
+                    0, 
+                    0, 
+                    this.canvas.width, 
+                    this.canvas.width,
+                    0,
+                    0,
+                    width, 
+                    height,
+                ];
             } else if (this.option.maskType === 'rect') {
                 clipArea = [
                     this.rectMaskWidth, 
