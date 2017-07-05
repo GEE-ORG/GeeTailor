@@ -36,10 +36,10 @@ const template = `
     <canvas class="gt-img" style="background-color: rgba(0,0,0,.8)"></canvas>
     <input class="gt-upload" type="file" accept="image/jpg,image/png" style="display: none">
     <button class="gt-ctrl_upload">Upload</button>
-    <div class="gt-info" style="position: fixed; top: 0; left: 0; display: none; background: #333; border-radius: 3px; font-size: 12px; padding: 2px 5px; color: #eee">
-        <span class="gt-info_size"></span>
-        <span class="gt-info_color"></span>
-        <span class="gt-info_position"></span>
+    <div class="gt-info" style="position: fixed; width: 120px; top: 0; left: 0; display: none; background: #333; border-radius: 3px; font-size: 12px; padding: 2px 5px; color: #eee">
+        <div class="gt-info_size"></div>
+        <div class="gt-info_color"></div>
+        <div class="gt-info_position"></div>
     </div>
 </div>
 `;
@@ -421,9 +421,11 @@ export default class GeeTailor {
             }
 
             if (e.target === this.canvas) {
+                const pixel = this.ctx.getImageData(point.x, point.y, 1, 1).data;
                 infoElement.style.display = 'inline-block';
                 infoElement.style.transform = `translate(${e.clientX + 20}px, ${e.clientY + 20}px)`;
-                this.info.position.innerText = `x: ${point.x / this.dpr} y: ${point.y}`;
+                this.info.position.innerText = `X: ${point.x / this.dpr} Y: ${point.y}`;
+                this.info.color.innerText = `RGB(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
             } else {
                 infoElement.style.display = 'none';
             }
@@ -572,40 +574,7 @@ export default class GeeTailor {
             ne: [x + width, y - resizeWidth],
             se: [x + width, y + height],
             sw: [x - resizeWidth, y + height],
-        }   
-
-        /**
-         *   n      n
-         *  w e -> e w
-         *   s      s
-        //  */
-        // if (flipSideWays) {
-        //     [
-        //         areas.e, areas.w, 
-        //         areas.ne, areas.nw, 
-        //         areas.se, areas.sw
-        //     ] = [
-        //         areas.w, areas.e, 
-        //         areas.nw, areas.ne,
-        //         areas.sw, areas.se
-        //     ];
-        // }
-        // /**
-        //  *   n      s
-        //  *  w e -> w e
-        //  *   s      n
-        //  */
-        // if (flipVertically) {
-        //     [
-        //         areas.s, areas.n, 
-        //         areas.nw, areas.sw,
-        //         areas.ne, areas.se
-        //     ] = [
-        //         areas.n, areas.s, 
-        //         areas.sw, areas.nw,
-        //         areas.se, areas.ne
-        //     ];
-        // }
+        };
 
         const pointer = {x: e.offsetX * this.dpr, y: e.offsetY * this.dpr};
 
@@ -628,7 +597,6 @@ export default class GeeTailor {
             }
         });
 
-        // this.info['position'].innerText += ' CTRL: [' + ctrl.position + ']' + JSON.stringify(pointer);
         return ctrl;
     }
 
