@@ -476,13 +476,19 @@ export default class GeeTailor {
                 (!this.isMoving && !this.isCropping && !this.isResizing) || 
                 this.isScaling
             ) return;
+            if (this.isCropping) {
+                this.cropEndX = e.offsetX * this.dpr;
+                this.cropEndY = e.offsetY * this.dpr;
+            }
             if (currentCtrlState.flipSideWays) {
+                currentCtrlState.flipSideWays = false;
                 [this.cropStartPoint, this.cropEndPoint] = [
                     {x: this.cropEndX, y: this.cropStartY},
                     {x: this.cropStartX, y: this.cropEndY}
                  ]
             }
             if (currentCtrlState.flipVertically) {
+                currentCtrlState.flipVertically = false;
                 [this.cropStartPoint, this.cropEndPoint] = [
                     {x: this.cropStartX, y: this.cropEndY},
                     {x: this.cropEndX, y: this.cropStartY}
