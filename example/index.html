@@ -55,7 +55,7 @@
             preview.src = gt.toBase64();
         });
 
-        const gt1 = new GeeTailor('.wrap1', {width: 800, height: 400});
+        const gt1 = new GeeTailor('.wrap1', {width: 800, height: 400, debug:true});
         const preview1 = document.querySelector('.gt-preview1');
         document.querySelector('.gt-ctrl_export1').addEventListener('click', () => {
             gt1.download();

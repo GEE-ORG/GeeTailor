@@ -11,21 +11,25 @@ type Mode = 'avatar' | 'free';
 type MaskType = 'circle' | 'rect';
 interface ctrlState {
     isInCtrl: boolean, 
-    position: 'n'|'e'|'w'|'s'|'nw'|'ne'|'se'|'sw'
+    dir: 'n'|'e'|'w'|'s'|'nw'|'ne'|'se'|'sw',
+    flipSideWays?: boolean,
+    flipVertically?: boolean
 };
 interface gtOption {
     width: number,
     height: number,
     mode: Mode,
     maskType: MaskType,
-    resizable: boolean
+    resizable: boolean,
+    debug: boolean
 };
 const defaultOption: gtOption = {
     width: 200,
     height: 200,
     mode: 'free',
     maskType: 'circle',
-    resizable: true
+    resizable: true,
+    debug: false
 }
 const template = `
 <div class="gt-canvas" style="display: inline-block">
@@ -201,6 +205,8 @@ export default class GeeTailor {
         } else if (this.mode === 'free') {
             const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
             const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
+            // const startPoint = (this.cropStartPoint);
+            // const endPoint = (this.cropEndPoint);
             // console.log(startPoint, endPoint)
             startPoint.x > endPoint.x && ([startPoint.x, endPoint.x] = [endPoint.x, startPoint.x]);
             startPoint.y > endPoint.y && ([startPoint.y, endPoint.y] = [endPoint.y, startPoint.y]);
@@ -210,6 +216,13 @@ export default class GeeTailor {
                 endPoint.x - startPoint.x, 
                 endPoint.y - startPoint.y
             );
+        }
+
+        if (this.option.debug) {
+            this.ctx.fillStyle = '#0f0';
+            this.ctx.fillRect(this.cropStartX, this.cropStartY, 10, 10);
+            this.ctx.fillStyle = '#00f';
+            this.ctx.fillRect(this.cropEndX - 10, this.cropEndY - 10, 10, 10);
         }
     }
 
@@ -379,9 +392,13 @@ export default class GeeTailor {
             const isMovingWholeImg = movingWholeImg(e);
             isInCroppingArea = pointInArea(point, area);
 
+            const tempCtrlState = this.getResizeCtrl(e);
             if (!this.isResizing) {
-                currentCtrlState = this.getResizeCtrl(e);
+                currentCtrlState = tempCtrlState;
             }
+
+            currentCtrlState.flipSideWays = tempCtrlState.flipSideWays;
+            currentCtrlState.flipVertically = tempCtrlState.flipVertically;
 
             // console.log(currentCtrlState);
             if (this.isCropping) {
@@ -389,7 +406,7 @@ export default class GeeTailor {
             } else if (isMovingWholeImg || isInCroppingArea) {
                 setCursor('move');
             } else if (currentCtrlState.isInCtrl) {
-                switch (currentCtrlState.position) {
+                switch (currentCtrlState.dir) {
                     case 'n':
                     case 's': setCursor('ns-resize'); break;
                     case 'e':
@@ -406,7 +423,7 @@ export default class GeeTailor {
             if (e.target === this.canvas) {
                 infoElement.style.display = 'inline-block';
                 infoElement.style.transform = `translate(${e.clientX + 20}px, ${e.clientY + 20}px)`;
-                this.info.position.innerText = `x: ${point.x / this.dpr} y: ${point.y / this.dpr}`;
+                this.info.position.innerText = `x: ${point.x / this.dpr} y: ${point.y}`;
             } else {
                 infoElement.style.display = 'none';
             }
@@ -432,8 +449,9 @@ export default class GeeTailor {
                 this.cropEndPoint.x = e.offsetX * this.dpr;
                 this.cropEndPoint.y = e.offsetY * this.dpr;
             } else if (this.isResizing) {
-                console.log(this.cropStartY, offsetY, e.clientY, startPoints.y);
-                switch (currentCtrlState.position) {
+                // console.log(currentCtrlState.position, this.cropStartY, offsetY, e.clientY, startPoints.y);
+                // let actulDir = 
+                switch (currentCtrlState.dir) {
                     case 'n': this.cropStartY += offsetY; break;
                     case 'e': this.cropEndX += offsetX; break;
                     case 'w': this.cropStartX += offsetX; break;
@@ -456,9 +474,17 @@ export default class GeeTailor {
                 (!this.isMoving && !this.isCropping && !this.isResizing) || 
                 this.isScaling
             ) return;
-            if (this.isCropping) {
-                this.cropEndX = e.offsetX * this.dpr;
-                this.cropEndY = e.offsetY * this.dpr;
+            if (currentCtrlState.flipSideWays) {
+                [this.cropStartPoint, this.cropEndPoint] = [
+                    {x: this.cropEndX, y: this.cropStartY},
+                    {x: this.cropStartX, y: this.cropEndY}
+                 ]
+            }
+            if (currentCtrlState.flipVertically) {
+                [this.cropStartPoint, this.cropEndPoint] = [
+                    {x: this.cropStartX, y: this.cropEndY},
+                    {x: this.cropEndX, y: this.cropStartY}
+                 ]
             }
             this.isMoving = false;
             this.isCropping = false;
@@ -508,22 +534,22 @@ export default class GeeTailor {
     private getResizeCtrl (e): ctrlState {
         const ctrl: ctrlState = {
             isInCtrl: false,
-            position: '' as any
+            dir: '' as any,
+            flipVertically: false,
+            flipSideWays: false
         };
         const startPoint = JSON.parse(JSON.stringify(this.cropStartPoint));
         const endPoint = JSON.parse(JSON.stringify(this.cropEndPoint));
-        let flipSideWays = false;
-        let flipVertically = false;
 
         // If cropping area is flipped sideways
         if (startPoint.x > endPoint.x) {
             [startPoint.x, endPoint.x] = [endPoint.x, startPoint.x];
-            flipSideWays = true;
+            ctrl.flipSideWays = true;
         }
         // If cropping area is flipped vertically
         if (startPoint.y > endPoint.y) {
             [startPoint.y, endPoint.y] = [endPoint.y, startPoint.y];
-            flipVertically = true;
+            ctrl.flipVertically = true;
         }
         
         const x = startPoint.x;
@@ -552,34 +578,34 @@ export default class GeeTailor {
          *   n      n
          *  w e -> e w
          *   s      s
-         */
-        if (flipSideWays) {
-            [
-                areas.e, areas.w, 
-                areas.ne, areas.nw, 
-                areas.se, areas.sw
-            ] = [
-                areas.w, areas.e, 
-                areas.nw, areas.ne,
-                areas.sw, areas.se
-            ];
-        }
-        /**
-         *   n      s
-         *  w e -> w e
-         *   s      n
-         */
-        if (flipVertically) {
-            [
-                areas.s, areas.n, 
-                areas.nw, areas.sw,
-                areas.ne, areas.se
-            ] = [
-                areas.n, areas.s, 
-                areas.sw, areas.nw,
-                areas.se, areas.ne
-            ];
-        }
+        //  */
+        // if (flipSideWays) {
+        //     [
+        //         areas.e, areas.w, 
+        //         areas.ne, areas.nw, 
+        //         areas.se, areas.sw
+        //     ] = [
+        //         areas.w, areas.e, 
+        //         areas.nw, areas.ne,
+        //         areas.sw, areas.se
+        //     ];
+        // }
+        // /**
+        //  *   n      s
+        //  *  w e -> w e
+        //  *   s      n
+        //  */
+        // if (flipVertically) {
+        //     [
+        //         areas.s, areas.n, 
+        //         areas.nw, areas.sw,
+        //         areas.ne, areas.se
+        //     ] = [
+        //         areas.n, areas.s, 
+        //         areas.sw, areas.nw,
+        //         areas.se, areas.ne
+        //     ];
+        // }
 
         const pointer = {x: e.offsetX * this.dpr, y: e.offsetY * this.dpr};
 
@@ -598,7 +624,7 @@ export default class GeeTailor {
             }
             if (pointInArea(pointer, area)) {
                 ctrl.isInCtrl = true;
-                ctrl.position = `${dir}` as any;
+                ctrl.dir = `${dir}` as any;
             }
         });
 
