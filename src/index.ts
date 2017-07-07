@@ -451,8 +451,6 @@ export default class GeeTailor {
                 this.cropEndPoint.x = e.offsetX * this.dpr;
                 this.cropEndPoint.y = e.offsetY * this.dpr;
             } else if (this.isResizing) {
-                // console.log(currentCtrlState.position, this.cropStartY, offsetY, e.clientY, startPoints.y);
-                // let actulDir = 
                 switch (currentCtrlState.dir) {
                     case 'n': this.cropStartY += offsetY; break;
                     case 'e': this.cropEndX += offsetX; break;
@@ -672,29 +670,56 @@ export default class GeeTailor {
         return this.cropStartPoint.x;
     }
     set cropStartX (val) {
+        if (this.cropEndX >= this.canvas.width) return;
         this.cropStartPoint.x = Number(val) || 0;
+        if (this.cropStartX < 0) {
+            this.cropStartX = 0;
+        }
+        if (this.cropStartX > this.canvas.width) {
+            this.cropStartX = this.canvas.width;
+        }
         this.hasChanged = true;
     }
     get cropStartY () {
         return this.cropStartPoint.y;
     }
     set cropStartY (val) {
-        // console.log('crop start y: ' + val);
+        if (this.cropEndY >= this.canvas.height) return;
         this.cropStartPoint.y = Number(val) || 0;
+        if (this.cropStartY < 0) {
+            this.cropStartY = 0;
+        }
+        if (this.cropStartY > this.canvas.height) {
+            this.cropStartY = this.canvas.height;
+        }
         this.hasChanged = true;
     }
     get cropEndX () {
         return this.cropEndPoint.x;
     }
     set cropEndX (val) {
+        if (this.cropStartX <= 0) return;
         this.cropEndPoint.x = Number(val) || 0;
+        if (this.cropEndX > this.canvas.width) {
+            this.cropEndX = this.canvas.width;
+        }
+        if (this.cropEndX < 0) {
+            this.cropEndX = 0;
+        }
         this.hasChanged = true;
     }
     get cropEndY () {
         return this.cropEndPoint.y;
     }
     set cropEndY (val) {
+        if (this.cropStartY <= 0) return;
         this.cropEndPoint.y = Number(val) || 0;
+        if (this.cropEndY > this.canvas.height) {
+            this.cropEndY = this.canvas.height;
+        }
+        if (this.cropEndY < 0) {
+            this.cropEndY = 0;
+        }
         this.hasChanged = true;
     }
     
