@@ -104,6 +104,17 @@ export default class GeeTailor {
 
     private _mode: 'avatar'|'free';
 
+    private events = {
+        'change': [],
+        'resize': [() => this.dispatch('change')],
+        'scale': [() => this.dispatch('change')],
+        'move': [() => this.dispatch('change')],
+        'crop': [() => this.dispatch('change')],
+        'beforeUpload': [],
+        'afterUpload': [],
+        'createImg': []
+    };
+
     constructor (el: Element, option: gtOption) {
         this.el = typeof el === 'string' ? document.querySelector(el) : el;
         this.option = assign(defaultOption, option);
@@ -254,7 +265,14 @@ export default class GeeTailor {
 
     private uploadEvents () {
         this.btns['upload'].addEventListener('click', () => {
+            this.dispatch('beforeUpload');
             this.upload.click();
+        });
+        this.canvas.addEventListener('click', () => {
+            this.dispatch('beforeUpload');
+            if (!this.canvasNotBlank) {
+                this.upload.click();
+            }
         });
         this.upload.addEventListener('change', (e: any) => {
             
@@ -271,6 +289,8 @@ export default class GeeTailor {
                 this.imgInit();
             };
             this.img.src = imgUrl;
+
+            this.dispatch('afterUpload');
         
         });
     }
@@ -304,6 +324,8 @@ export default class GeeTailor {
             st = setTimeout(() => {
                 this.isScaling = false;
             }, 200);
+
+            this.dispatch('scale');
         });
     }
     private addEvents () {
@@ -361,16 +383,22 @@ export default class GeeTailor {
                 if (isInCroppingArea) {
                     this.isMovingCrop = true;
                 }
+                this.dispatch('move');
+
             } else if (currentCtrlState.isInCtrl)  {
 
                 this.isResizing = true;
                 startPoints.x = e.clientX;
                 startPoints.y = e.clientY;
+                
+                this.dispatch('resize');
 
             } else {
                 this.isCropping = true;
                 this.cropStartX = e.offsetX * this.dpr;
                 this.cropStartY = e.offsetY * this.dpr;
+
+                this.dispatch('crop');
             }
         }
         function mouseMove (e) {
@@ -446,10 +474,12 @@ export default class GeeTailor {
                     this.imgOffsetX += offsetX;
                     this.imgOffsetY += offsetY;
                 }
+                this.dispatch('move');
                 
             } else if (this.isCropping) {
-                this.cropEndPoint.x = e.offsetX * this.dpr;
-                this.cropEndPoint.y = e.offsetY * this.dpr;
+                this.cropEndX = e.offsetX * this.dpr;
+                this.cropEndY = e.offsetY * this.dpr;
+                this.dispatch('crop');
             } else if (this.isResizing) {
                 switch (currentCtrlState.dir) {
                     case 'n': this.cropStartY += offsetY; break;
@@ -461,6 +491,7 @@ export default class GeeTailor {
                     case 'ne': this.cropEndX += offsetX; this.cropStartY += offsetY; break;
                     case 'sw': this.cropStartX += offsetX; this.cropEndY += offsetY; break;
                 }
+                this.dispatch('resize');
             }
 
             startPoints.x = e.clientX;
@@ -602,6 +633,36 @@ export default class GeeTailor {
         });
 
         return ctrl;
+    }
+
+    public on (eventName: string, cb: Function) {
+        if (typeof cb !== 'function') {
+            console.error('Second argument is not a function.');
+        }
+        this.events[eventName].push(cb);
+    }
+
+    public dispatch (eventName: string) {
+        const event = {
+            target: this.canvas,
+            mode: this.mode,
+            eventName: eventName,
+            cropArea: {
+                start: this.cropStartPoint,
+                end: this.cropEndPoint
+            },
+            imgBoundingRect: this.imgBounding,
+            originalSize: this.original,
+            dpr: this.dpr,
+            state: {
+                isMoving: this.isMoving,
+                isMovingCrop: this.isMovingCrop,
+                isCropping: this.isCropping,
+                isResizing: this.isResizing,
+                isScaling: this.isScaling
+            }
+        }
+        this.events[eventName].forEach(cb => cb(event));
     }
 
     get mode () {
@@ -797,6 +858,8 @@ export default class GeeTailor {
         (this.outCtx.drawImage as any)(this.canvas, ...clipArea);
 
         this.hasChanged = false;
+
+        this.dispatch('createImg');
     }
 
     public toBase64 () {

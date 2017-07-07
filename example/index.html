@@ -63,6 +63,8 @@
         document.querySelector('.gt-ctrl_preview1').addEventListener('click', () => {
             preview1.src = gt1.toBase64();
         });
+
+        gt1.on('change', e => console.log(e, e.eventName));
     </script>
         
 </body>
