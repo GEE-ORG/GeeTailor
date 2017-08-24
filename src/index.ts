@@ -102,6 +102,8 @@ export default class GeeTailor {
     }
     private resizeCtrlWidth = 5 * this.dpr;
 
+    public currentDegree = 90;
+
     private _mode: 'avatar'|'free';
 
     private events = {
@@ -190,6 +192,8 @@ export default class GeeTailor {
     }
 
     private drawImg () {
+        this.ctx.save();
+        this.ctx.rotate((this.currentDegree / 180) * Math.PI);
         this.ctx.drawImage(
             this.img,
             this.imgOffsetX, 
@@ -197,6 +201,8 @@ export default class GeeTailor {
             this.imgWidth, 
             this.imgHeight
         );
+        this.ctx.restore();
+        this.ctx.rotate(0);
     }
 
     private drawMask () {
@@ -567,6 +573,12 @@ export default class GeeTailor {
             offsetY: (this.canvas.height - height) / 2 
         }
     }
+
+    // public rotate (degree: number = 90) {
+    //     this.ctx.save();
+    //     this.ctx.rotate((degree / 180) * Math.PI);
+
+    // }
     
     private getResizeCtrl (e): ctrlState {
         const ctrl: ctrlState = {
